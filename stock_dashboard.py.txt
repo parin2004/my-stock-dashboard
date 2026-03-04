@@ -1,0 +1,45 @@
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+
+# 1. ตั้งค่าหน้าเว็บ
+st.set_page_config(page_title="AI Stock Dashboard", layout="wide")
+
+st.title("📈 AI Stock Analysis Dashboard")
+st.markdown("วิเคราะห์หุ้นตัวโปรดของคุณได้ง่ายๆ แค่ปลายนิ้ว")
+
+# 2. Sidebar สำหรับเลือกหุ้น
+st.sidebar.header("ตั้งค่าการค้นหา")
+ticker = st.sidebar.text_input("ระบุชื่อย่อหุ้น (Ticker):", value="AAPL")
+period = st.sidebar.selectbox("ช่วงเวลา:", ["1mo", "3mo", "6mo", "1y", "5y"])
+
+# 3. ดึงข้อมูล
+@st.cache_data # ช่วยให้เว็บโหลดเร็วขึ้น ไม่ต้องดึงข้อมูลใหม่ทุกรอบ
+def load_data(ticker, period):
+    data = yf.download(ticker, period=period)
+    return data
+
+try:
+    data = load_data(ticker, period)
+
+    # 4. แสดงตัวเลขสรุป (Metrics)
+    last_price = data['Close'].iloc[-1]
+    prev_price = data['Close'].iloc[-2]
+    change = last_price - prev_price
+
+    col1, col2 = st.columns(2)
+    col1.metric("ราคาล่าสุด", f"${last_price:,.2f}", f"{change:,.2f}")
+    col2.metric("ปริมาณการซื้อขาย", f"{data['Volume'].iloc[-1]:,.0f}")
+
+    # 5. กราฟ Interactive (ใช้ Plotly เพื่อให้ซูมเข้า-ออกได้)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=data.index, y=data['Close'], mode='lines', name='Price'))
+    fig.update_layout(title=f"กราฟราคาหุ้น {ticker}", xaxis_title="วันที่", yaxis_title="ราคา (USD)")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 6. แสดงตารางข้อมูลดิบ
+    with st.expander("ดูข้อมูลดิบ (Raw Data)"):
+        st.write(data.tail(10))
+
+except Exception as e:
+    st.error("ไม่พบข้อมูลหุ้นที่คุณระบุ กรุณาตรวจสอบชื่อ Ticker อีกครั้ง (เช่น AAPL, TSLA, BTC-USD)")
